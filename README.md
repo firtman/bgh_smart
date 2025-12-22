@@ -31,7 +31,7 @@ Integración personalizada para controlar aires acondicionados BGH Smart vía UD
 2. Ve a "Integraciones"
 3. Haz clic en los tres puntos (⋮) arriba a la derecha
 4. Selecciona "Repositorios personalizados"
-5. Agrega esta URL: `https://github.com/user/bgh_smart`
+5. Agrega esta URL: `https://github.com/firtman/bgh_smart`
 6. Categoría: `Integration`
 7. Busca "BGH Smart Control" y descárgala
 8. Reinicia Home Assistant
