@@ -210,9 +210,9 @@ class BGHClient:
                     # Extract device ID from first broadcast (bytes 1-6, after initial 0x00)
                     if not self._device_id:
                         self._device_id = data[1:7].hex()
-                        _LOGGER.warning(">>> DEVICE ID EXTRACTED <<<")
-                        _LOGGER.warning("    Raw broadcast: %s", data.hex())
-                        _LOGGER.warning("    Device ID: %s", self._device_id)
+                        _LOGGER.info(">>> DEVICE ID EXTRACTED <<<")
+                        _LOGGER.debug("    Raw broadcast: %s", data.hex())
+                        _LOGGER.info("    Device ID: %s", self._device_id)
                     
                     status = self._parse_status(data)
                     
@@ -232,7 +232,7 @@ class BGHClient:
                     
                     if broadcast_timeout == 1:
                         _LOGGER.warning("⚠️  No broadcasts received from %s (network issue?)", self.host)
-                        _LOGGER.warning("   Switching to polling mode...")
+                        _LOGGER.info("   Switching to polling mode...")
                     
                     # Request status when no broadcasts arrive
                     _LOGGER.debug("Polling: Requesting status from %s", self.host)
