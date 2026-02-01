@@ -397,13 +397,57 @@ Fuerza al aire a enviar un broadcast con su estado actual.
 
 ---
 
-## Cambio de WiFi
+## Configuración WiFi (Provisioning)
 
-El cambio de WiFi no está incluido en esta integración. Tu aire ya debe estar conectado a la red.
+Esta integración incluye un módulo para configurar las credenciales WiFi de tu aire acondicionado BGH Smart cuando está en **MODO CONECTAR**.
 
-### Del manual oficial: 
+### Paso 1: Poner el aire en MODO CONECTAR
 
-Para volver tu aire acondicionado al **MODO CONECTAR**, tomá el control remoto del equipo y llevá el aire a 29°C y luego a 30°C, repetí esta secuencia hasta que el equipo se apague. Cuando vuelvas a encender el aire acondicionado, estará en MODO CONECTAR listo para volver a vincularse.
+Usando el control remoto del equipo:
+1. Llevá la temperatura a **29°C** y luego a **30°C**
+2. Repetí este ciclo varias veces hasta que el equipo se apague
+3. Al volver a encender, estará en **MODO CONECTAR**
+4. El dispositivo emitirá un hotspot WiFi tipo `BGH-XXXX`
+
+### Paso 2: Conectarse al hotspot del aire
+
+Conectá tu PC o teléfono a la red WiFi `BGH-XXXX` que emite el aire.
+
+### Paso 3: Descubrir el Device MAC
+
+```bash
+python -m bgh_smart.wifi_provision --discover
+```
+
+Esto escucha broadcasts del aire y devuelve su Device MAC.
+
+### Paso 4: Enviar credenciales WiFi
+
+```bash
+python -m bgh_smart.wifi_provision \
+  --device-ip <IP_DEL_AIRE> \
+  --device-mac <DEVICE_MAC> \
+  --ssid "TuRedWiFi" \
+  --password "TuPassword"
+```
+
+**Parámetros:**
+- `--device-ip`: IP del aire en modo setup (gateway del hotspot)
+- `--device-mac`: Device MAC obtenido en el paso anterior
+- `--ssid`: Nombre de tu red WiFi (debe ser 2.4GHz)
+- `--password`: Password de tu red WiFi
+- `--security`: Tipo de seguridad (0=Open, 1=WEP, 2=WPA, 3=WPA2). Default: 3
+- `--encryption`: Tipo de encriptación (0=None, 3=TKIP, 4=AES). Default: 4
+
+### Paso 5: Esperar conexión
+
+El aire se conectará a tu red WiFi en 10-30 segundos. Una vez conectado, podés agregarlo a Home Assistant.
+
+### Troubleshooting
+
+- **No hay respuesta**: Verificar que el aire esté en MODO CONECTAR y estés conectado a su hotspot
+- **No se conecta al WiFi**: Verificar SSID/password y que la red sea 2.4GHz
+- **HA no detecta el aire**: Verificar que estén en la misma red/subred
 
 ---
 
