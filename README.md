@@ -439,6 +439,8 @@ python -m bgh_smart.wifi_provision \
 - `--security`: Tipo de seguridad (0=Open, 1=WEP, 2=WPA, 3=WPA2). Default: 3
 - `--encryption`: Tipo de encriptación (0=None, 3=TKIP, 4=AES). Default: 4
 
+NOTA: La password del WiFi se envía por texto plano y queda en el historial de tu terminal. Esto es una limitación del protocolo de BGH. Se recomienda limpiar el historial de la Terminal en caso de ser necesario y no quieras exponer allí la clave de tu SSID.
+
 ### Paso 5: Esperar conexión
 
 El aire se conectará a tu red WiFi en 10-30 segundos. Una vez conectado, podés agregarlo a Home Assistant.
