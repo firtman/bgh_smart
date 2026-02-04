@@ -1,12 +1,12 @@
 {
   "domain": "bgh_smart",
   "name": "BGH Smart Control - Home Assistant",
-  "codeowners": ["@firtman", "@JMVS"],
+  "codeowners": ["@firtman"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/JMVS/bgh_smart",
+  "documentation": "https://github.com/firtman/bgh_smart",
   "integration_type": "device",
   "iot_class": "local_polling",
   "requirements": [],
-  "version": "1.0.1"
+  "version": "1.0.0"
 }
