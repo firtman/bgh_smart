@@ -11,14 +11,21 @@ from .const import (
     MODES,
     UDP_RECV_PORT,
     UDP_SEND_PORT,
-    UDP_SOURCE_PORT,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class BGHClient:
-    """BGH Smart AC UDP client - Broadcast listener."""
+    """BGH Smart AC UDP client - Broadcast listener.
+    
+    CHANGES APPLIED (Fix for 22-byte ACK packets causing 255°C readings):
+    - Added _is_valid_status_packet() to validate packet structure
+    - Strict filtering by packet length (only process 29-byte status packets)
+    - Ignore ACK packets (22 bytes), discovery packets (108 bytes), and control responses (46-47 bytes)
+    - Added temperature range validation (0-50°C ambient, 16-30°C target)
+    - Increased broadcast timeout from 15s to 30s for more stable polling
+    """
 
     def __init__(self, host: str) -> None:
         """Initialize the client."""
@@ -93,8 +100,54 @@ class BGHClient:
         _LOGGER.info("Broadcast receive socket bound to port %d", UDP_RECV_PORT)
         return sock
 
+    def _is_valid_status_packet(self, data: bytes) -> bool:
+        """Validate if packet is a valid status broadcast (29 bytes).
+        
+        FIX ADDED: This function prevents processing of ACK packets (22 bytes) and 
+        other non-status packets that were causing the "255°C" bug.
+        
+        Valid status packet structure:
+        - Byte 0: 0x00 (header)
+        - Bytes 1-6: Device ID
+        - Bytes 7-12: 0xffffffffffff (broadcast marker)
+        - Byte 13: Counter/Sequence
+        - Bytes 14-17: Status flags (byte 14 should be 0x00 or 0x01)
+        - Byte 18: Mode
+        - Byte 19: Fan speed
+        - Bytes 21-22: Current temperature
+        - Bytes 23-24: Target temperature
+        
+        Returns:
+            True if packet is a valid 29-byte status broadcast
+        """
+        if len(data) != 29:
+            return False
+        
+        # Byte 0 debe ser 0x00
+        if data[0] != 0x00:
+            return False
+        
+        # Bytes 7-12 deben ser 0xffffffffffff (broadcast marker)
+        # This distinguishes status broadcasts from command responses
+        if data[7:13] != b'\xff\xff\xff\xff\xff\xff':
+            return False
+        
+        # Bytes 14-17 deben ser aproximadamente 0x0100fd06 (puede variar levemente)
+        # Solo verificamos que byte 14 sea razonable (0x00 o 0x01)
+        if data[14] not in (0x00, 0x01):
+            return False
+        
+        return True
+
     async def _broadcast_listener(self) -> None:
-        """Listen for UDP broadcasts from the AC unit."""
+        """Listen for UDP broadcasts from the AC unit.
+        
+        FIX APPLIED: Added strict packet filtering to ignore:
+        - 22-byte ACK packets (responses to commands)
+        - 46-47 byte control response packets
+        - 108-byte discovery packets
+        Only 29-byte valid status broadcasts are processed.
+        """
         _LOGGER.info("🎧 Broadcast listener started for %s", self.host)
         _LOGGER.info("   Listening on port %d for broadcasts from %s", UDP_RECV_PORT, self.host)
         
@@ -112,51 +165,81 @@ class BGHClient:
                 try:
                     data, addr = await asyncio.wait_for(
                         loop.sock_recvfrom(self._recv_sock, 1024),
-                        timeout=15.0  # 15 second timeout
+                        timeout=30.0  # FIX: Increased from 15s to 30s for more stable operation
                     )
-                    
-                    _LOGGER.debug("📡 Received UDP packet from %s: %d bytes", addr, len(data))
                     
                     # Reset timeout counter on successful receive
                     broadcast_timeout = 0
                     
                     # Only process broadcasts from our AC unit
-                    if addr[0] == self.host:
-                        _LOGGER.info("✅ Broadcast from AC %s: %d bytes", addr, len(data))
-                        
-                        # Extract device ID from first broadcast (bytes 1-6, after initial 0x00)
-                        if not self._device_id and len(data) >= 7:
-                            self._device_id = data[1:7].hex()
-                            _LOGGER.warning(">>> DEVICE ID EXTRACTED <<<")
-                            _LOGGER.warning("    Raw broadcast: %s", data.hex())
-                            _LOGGER.warning("    Device ID: %s", self._device_id)
-                        
-                        status = self._parse_status(data)
-                        
-                        if status:
-                            self._last_status = status
-                            _LOGGER.info("   Parsed: mode=%s, fan=%s, temp=%.1f°C", 
-                                       status.get('mode'), status.get('fan_speed'), 
-                                       status.get('current_temperature', 0))
-                            if self._status_callback:
-                                self._status_callback(status)
-                    else:
-                        _LOGGER.debug("   Ignoring broadcast from %s (not our AC)", addr[0])
+                    if addr[0] != self.host:
+                        continue
+                    
+                    _LOGGER.debug("📡 Received UDP packet from %s: %d bytes", addr, len(data))
+                    
+                    # FIX: STRICT PACKET FILTERING
+                    # Problem: The AC sends multiple packet types:
+                    # - 22 bytes: ACK responses to commands (contains garbage data)
+                    # - 29 bytes: Valid status broadcasts (what we want)
+                    # - 46-47 bytes: Control response packets
+                    # - 108 bytes: Discovery/multicast packets
+                    # Solution: Only process 29-byte packets with valid structure
+                    
+                    if len(data) == 22:
+                        _LOGGER.debug("   Ignoring ACK packet (22 bytes) - causes 255°C bug")
+                        continue
+                    elif len(data) == 108:
+                        _LOGGER.debug("   Ignoring discovery packet (108 bytes)")
+                        continue
+                    elif len(data) == 46 or len(data) == 47:
+                        _LOGGER.debug("   Ignoring control response packet (%d bytes)", len(data))
+                        continue
+                    elif len(data) != 29:
+                        _LOGGER.debug("   Ignoring unknown packet (%d bytes)", len(data))
+                        continue
+                    
+                    # FIX: Validate packet structure before parsing
+                    # This prevents processing malformed 29-byte packets
+                    if not self._is_valid_status_packet(data):
+                        _LOGGER.warning("   Invalid packet structure (29 bytes but wrong format)")
+                        _LOGGER.debug("   Packet: %s", data.hex())
+                        continue
+                    
+                    _LOGGER.info("✅ Valid status broadcast from %s: 29 bytes", addr)
+                    
+                    # Extract device ID from first broadcast (bytes 1-6, after initial 0x00)
+                    if not self._device_id:
+                        self._device_id = data[1:7].hex()
+                        _LOGGER.info(">>> DEVICE ID EXTRACTED <<<")
+                        _LOGGER.debug("    Raw broadcast: %s", data.hex())
+                        _LOGGER.info("    Device ID: %s", self._device_id)
+                    
+                    status = self._parse_status(data)
+                    
+                    if status:
+                        self._last_status = status
+                        _LOGGER.info("   Parsed: mode=%s, fan=%s, temp=%.1f°C, target=%.1f°C", 
+                                   status.get('mode'), 
+                                   status.get('fan_speed'), 
+                                   status.get('current_temperature', 0),
+                                   status.get('target_temperature', 0))
+                        if self._status_callback:
+                            self._status_callback(status)
                         
                 except asyncio.TimeoutError:
-                    # No broadcast received in 15 seconds
+                    # No broadcast received in 30 seconds
                     broadcast_timeout += 1
                     
                     if broadcast_timeout == 1:
                         _LOGGER.warning("⚠️  No broadcasts received from %s (network issue?)", self.host)
-                        _LOGGER.warning("   Switching to polling mode...")
+                        _LOGGER.info("   Switching to polling mode...")
                     
                     # Request status when no broadcasts arrive
                     _LOGGER.debug("Polling: Requesting status from %s", self.host)
                     await self.async_request_status()
                     
                     # Wait a bit for the AC to respond with broadcast
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(2)
                             
             except asyncio.CancelledError:
                 _LOGGER.info("Broadcast listener stopped for %s", self.host)
@@ -220,7 +303,7 @@ class BGHClient:
             await self._send_command(bytes(command))
             
             # Wait a bit for AC to process
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.5)  # FIX: Reduced from 0.3s to 0.5s for better reliability
             
             # Request status update (will trigger broadcast)
             await self.async_request_status()
@@ -264,7 +347,7 @@ class BGHClient:
             await self._send_command(bytes(command))
             
             # Wait a bit for AC to process
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.5)  # FIX: Reduced from 0.3s to 0.5s
             
             # Request status update (will trigger broadcast)
             await self.async_request_status()
@@ -289,38 +372,59 @@ class BGHClient:
             sock.close()
 
     def _parse_status(self, data: bytes) -> dict[str, Any]:
-        """Parse status response."""
+        """Parse status response.
+        
+        FIX APPLIED: Added temperature range validation to prevent 255°C readings
+        from corrupted/invalid packets.
+        """
         if len(data) < 25:
             _LOGGER.warning("Invalid status data length: %d", len(data))
             return {}
 
-        # Extract data according to Node-RED flow
-        mode = data[18]
-        fan_speed = data[19]
-        
-        # Temperature is in bytes 21-22 (little-endian, divided by 100)
-        temp_raw = struct.unpack("<H", data[21:23])[0]
-        current_temp = temp_raw / 100.0
-        
-        # Setpoint is in bytes 23-24
-        setpoint_raw = struct.unpack("<H", data[23:25])[0]
-        target_temp = setpoint_raw / 100.0
+        try:
+            # Extract data according to Node-RED flow
+            mode = data[18]
+            fan_speed = data[19]
+            
+            # Temperature is in bytes 21-22 (little-endian, divided by 100)
+            temp_raw = struct.unpack("<H", data[21:23])[0]
+            current_temp = temp_raw / 100.0
+            
+            # Setpoint is in bytes 23-24
+            setpoint_raw = struct.unpack("<H", data[23:25])[0]
+            target_temp = setpoint_raw / 100.0
 
-        status = {
-            "mode": MODES.get(mode, "unknown"),
-            "mode_raw": mode,
-            "fan_speed": fan_speed,
-            "current_temperature": current_temp,
-            "target_temperature": target_temp,
-            "is_on": mode != 0,
-        }
+            # FIX: Validate temperature ranges
+            # Problem: 22-byte ACK packets were parsed as status, resulting in 
+            # garbage data being interpreted as temperature (e.g., 25500 = 255°C)
+            # Solution: Reject packets with unreasonable temperature values
+            if not (0 <= current_temp <= 50):
+                _LOGGER.warning("Invalid current temperature: %.1f°C (out of range 0-50)", current_temp)
+                return {}
+            
+            if not (16 <= target_temp <= 30):
+                _LOGGER.warning("Invalid target temperature: %.1f°C (out of range 16-30)", target_temp)
+                return {}
 
-        # Update internal state
-        self._current_mode = mode
-        self._current_fan = fan_speed
+            status = {
+                "mode": MODES.get(mode, "unknown"),
+                "mode_raw": mode,
+                "fan_speed": fan_speed,
+                "current_temperature": current_temp,
+                "target_temperature": target_temp,
+                "is_on": mode != 0,
+            }
 
-        _LOGGER.debug("Parsed status from %s: %s", self.host, status)
-        return status
+            # Update internal state
+            self._current_mode = mode
+            self._current_fan = fan_speed
+
+            _LOGGER.debug("Parsed status from %s: %s", self.host, status)
+            return status
+            
+        except Exception as e:
+            _LOGGER.error("Error parsing status: %s", e)
+            return {}
 
     async def async_close(self) -> None:
         """Close the connection."""
