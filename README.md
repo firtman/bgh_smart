@@ -26,10 +26,8 @@ Integración personalizada para controlar aires acondicionados BGH Smart vía UD
 ## Requisitos
 
 - Home Assistant 2023.1 o superior
-- Aire acondicionado BGH Smart con control IP/WiFi
+- Aire acondicionado BGH Smart con control IP/WiFi o BGH Smart Control Kit
 - IP fija configurada en tu router para cada equipo
-
-NOTA: No se por el momento si funciona con el BGH Smart Control Kit (el pequeño dispositivo smart que se conecta con aires acondicionados de cualquier marca). Esto está probado con los equipos BGH.
 
 ## Instalación
 
@@ -219,6 +217,7 @@ Enciende o apaga el equipo.
 2. Asegúrate de que el aire esté encendido y conectado al WiFi
 3. Verifica que Home Assistant y el aire estén en la misma red (o con routing habilitado)
 4. Prueba hacer ping a la IP del aire desde Home Assistant
+5. Verifica que la red WiFi sea 2.4Ghz
 
 ### Los comandos no funcionan
 
