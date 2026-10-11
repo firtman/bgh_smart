@@ -61,7 +61,7 @@ Si falta el tercero, el síntoma típico es este: la IR emite (se ve con la cám
   - `wifi_provision.py` de [firtman/bgh_smart](https://github.com/firtman/bgh_smart), para el Paso 1
   - `bgh_sync.py`, que acompaña esta guía, para el Paso 4
 
-> **Importante:** el kit **solo trae códigos IR de aires BGH**. Con otras marcas no funciona.
+> **¿Sirve para otras marcas?** El kit trae una tabla de protocolos IR que no se limita a BGH. Muchos aires BGH son fabricados por otras marcas, y el kit reconoce esos protocolos. Está **comprobado con un aire LG** (codec 60, ver la tabla del Paso 4). Para otras marcas, la única forma de saberlo es probar el Paso 4: si el kit identifica tu control remoto (`IR-CMD <n>` en el log), lo soporta.
 
 ---
 
@@ -172,7 +172,7 @@ Cada kit aparece como una entidad `climate` con modos frío, calor, seco, ventil
 
 Este es el paso que **no estaba documentado en ningún lado** y es el motivo de esta guía.
 
-Hay muchos aires BGH, y no todos usan el mismo protocolo infrarrojo. La app tenía un paso "sincronizá tu control remoto": activaba un **modo aprendizaje** en el kit, te pedía apretar **ENCENDIDO** dos veces apuntando a la IR, y el kit identificaba el protocolo, al que llama **codec**. **Sin ese comando, la IR ignora el control.** Por eso apretar el control "a mano" no hace nada.
+Cada marca y modelo de aire usa su propio protocolo infrarrojo. La app tenía un paso "sincronizá tu control remoto": activaba un **modo aprendizaje** en el kit, te pedía apretar **ENCENDIDO** dos veces apuntando a la IR, y el kit identificaba el protocolo, al que llama **codec**. **Sin ese comando, la IR ignora el control.** Por eso apretar el control "a mano" no hace nada.
 
 El script `bgh_sync.py` reproduce ese asistente completo.
 
@@ -219,7 +219,7 @@ Codecs reportados por la comunidad:
 
 | Codec | Trama | Aire / control |
 |---|---|---|
-| 60 | LG | BGH (agregar modelo) |
+| 60 | LG | Aire **LG** (agregar modelo de aire y de control) |
 
 *Si lo configurás, sumá tu modelo de aire, el modelo de control y el codec a esta tabla.*
 
