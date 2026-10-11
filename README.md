@@ -226,6 +226,7 @@ Enciende o apaga el equipo.
    - Busca errores relacionados con `bgh_smart`
 2. Verifica que no haya firewall bloqueando los puertos UDP 20910/20911
 3. Asegúrate de que el Device ID se haya extraído correctamente (aparece en los logs al iniciar)
+4. **Smart Control Kit:** si la unidad IR emite (se ve con la cámara del celular) pero el aire no responde, falta sincronizar el control remoto. Ver [Smart Control Kit: sincronizar el control remoto](#smart-control-kit-sincronizar-el-control-remoto)
 
 ### El estado no se actualiza
 
@@ -450,6 +451,21 @@ El aire se conectará a tu red WiFi en 10-30 segundos. Una vez conectado, podés
 - **No se conecta al WiFi**: Verificar SSID/password y que la red sea 2.4GHz
 - **HA no detecta el aire**: Verificar que estén en la misma red/subred
 
+## Smart Control Kit: sincronizar el control remoto
+
+Si tenés un **BGH Smart Control Kit (HPA-4911)** nuevo o reseteado, después de conectarlo al WiFi y vincular la unidad IR con la base falta un paso: **sincronizar el control remoto**, para que el kit sepa qué protocolo IR usa tu aire. Sin esto, la unidad IR emite pero el aire no responde.
+
+Antes lo hacía la app. Ahora se hace con `tools/bgh_sync.py` (Python 3, sin dependencias), que reproduce el asistente de la app en la red local:
+
+```bash
+sudo python3 tools/bgh_sync.py <IP_DEL_KIT>
+
+El script activa el modo aprendizaje del kit y te pide apretar ENCENDIDO en el control apuntando a la unidad IR. Después detecta el protocolo, hace una prueba de "beeps" para ubicar la IR y guarda la configuración. Si Home Assistant corre en Docker, lo detiene durante el proceso y lo vuelve a iniciar al final.
+
+Funciona también con aires de otras marcas: está probado con un LG (codec 60).
+
+📖 Guía completa desde cero (reset, WiFi, vinculación IR, sincronización, diagnóstico y referencia del protocolo): docs/GUIA_BGH_SMART_CONTROL_KIT.md
+
 ---
 
 ## Créditos
@@ -459,6 +475,8 @@ Desarrollado mediante ingeniería inversa del protocolo BGH Smart Control UDP, m
 Agradecimientos:
 - Comunidad de Home Assistant
 - Usuarios que compartieron capturas de tráfico y configuraciones de Node-RED
+- Comunidad del issue #7 por el procedimiento de vinculación IR ↔ WiFi
+- Sincronización del control remoto del Smart Control Kit: análisis del asistente de la app oficial BGH Smart Control ([#14](https://github.com/firtman/bgh_smart/issues/14))
 
 ## Licencia
 
