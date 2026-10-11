@@ -459,12 +459,13 @@ Antes lo hacía la app. Ahora se hace con `tools/bgh_sync.py` (Python 3, sin dep
 
 ```bash
 sudo python3 tools/bgh_sync.py <IP_DEL_KIT>
+```
 
-El script activa el modo aprendizaje del kit y te pide apretar ENCENDIDO en el control apuntando a la unidad IR. Después detecta el protocolo, hace una prueba de "beeps" para ubicar la IR y guarda la configuración. Si Home Assistant corre en Docker, lo detiene durante el proceso y lo vuelve a iniciar al final.
+El script activa el modo aprendizaje del kit y te pide apretar **ENCENDIDO** en el control apuntando a la unidad IR. Después detecta el protocolo, hace una prueba de "beeps" para ubicar la IR y guarda la configuración. Si Home Assistant corre en Docker, lo detiene durante el proceso y lo vuelve a iniciar al final.
 
-Funciona también con aires de otras marcas: está probado con un LG (codec 60).
+Funciona también con aires de otras marcas: está probado con un **LG** (codec 60).
 
-📖 Guía completa desde cero (reset, WiFi, vinculación IR, sincronización, diagnóstico y referencia del protocolo): docs/GUIA_BGH_SMART_CONTROL_KIT.md
+📖 Guía completa desde cero (reset, WiFi, vinculación IR, sincronización, diagnóstico y referencia del protocolo): [docs/GUIA_BGH_SMART_CONTROL_KIT.md](docs/GUIA_BGH_SMART_CONTROL_KIT.md)
 
 ---
 
