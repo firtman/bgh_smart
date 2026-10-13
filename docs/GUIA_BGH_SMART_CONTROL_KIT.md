@@ -191,14 +191,19 @@ El script:
 3. **Verifica la unidad IR**: señal BLE, batería y MAC. Si no está vinculada, te explica el Paso 2.
 4. Te pide **apuntar el control original a la IR y apretar ENCENDIDO**, y después **otra vez** para confirmar. Muestra el **codec** detectado.
 5. Fija el codec y hace que **la IR emita cada 3 segundos**. Acercala al display del aire, a menos de 5 cm, hasta que el aire haga **"beep"** en cada emisión: esa es la posición donde va el sticker.
-6. Te pregunta **dónde está enchufado el aire**, en la base o en otro tomacorriente. Esto configura el sensor de consumo.
-7. **Guarda** la configuración en el kit y sale del modo aprendizaje.
+6. Te pregunta **cómo va a saber el kit si el aire está encendido**: con el sensor de consumo (aire enchufado en la base) o con el sensor de vibración de la IR (aire en otro tomacorriente). Ver [4.3](#43-codecs-toggle-por-qué-importa-el-sensor).
+7. **Calibra el sensor de vibración** (comando `100`) y sale del modo aprendizaje. Para eso, **la IR tiene que estar ya pegada** en su lugar definitivo y **el aire apagado y totalmente detenido**.
 8. Hace una **prueba final**: enciende el aire en frío a 24 °C y lo apaga.
+
+**Si el kit no confirma un paso necesario** (modo aprendizaje, codec, codec + sensor o guardado), el script **no sigue de largo**. Te dice si el kit **rechazó** el comando o **no respondió**, y te deja **reintentar** o **cancelar**. Si cancelás, intenta sacar al kit del modo aprendizaje, vuelve a iniciar Home Assistant y avisa que **el kit no quedó configurado**. El mensaje "Configuración guardada en el kit" aparece solo si se confirmó el guardado.
+
+Si el guardado no se confirma, revisá que el aire siga apagado y detenido y que la IR no se haya movido, y reintentá.
 
 Anotá el codec. Para reconfigurar después sin releer el control:
 ```bash
 sudo python3 bgh_sync.py 10.0.0.12 --codec 60
 ```
+El codec es un número de 0 a 255.
 
 Para ver en pantalla los mensajes internos del kit, usá `--debug`. Siempre quedan guardados en `bgh_sync.log`.
 
@@ -215,13 +220,67 @@ LEARN MODE=FALSE
 >> MODE_OFF 23 FAN_MODE_MID FLAGS=00  ← emisiones de prueba ("beeps")
 ```
 
-Codecs reportados por la comunidad:
+### 4.3 Codecs toggle: por qué importa el sensor
 
-| Codec | Trama | Aire / control |
+Algunos controles no mandan "encender" o "apagar": mandan **la misma señal de power para las dos cosas** (toggle). Con esos codecs, el kit necesita **saber el estado real del aire** para decidir si manda o no la señal de power. Si no lo sabe, se desfasa: **pedís un modo y el aire se apaga, pedís apagar y se enciende**.
+
+El kit conoce el estado gracias al sensor que se elige en el paso 6 del script:
+
+| Valor | Sensor | Requisito |
 |---|---|---|
-| 60 | LG | Aire **LG** (agregar modelo de aire y de control) |
+| **1** | Consumo, medido en el tomacorriente de la base | El aire **enchufado en la unidad Wi-Fi** (recomendado) |
+| **2** | Vibración, medida por la unidad IR | La IR **pegada al aire** |
+| 0 | Ninguno | Solo para codecs no toggle |
+
+Según la app, **los codecs no toggle** son 1, 10, 12, 13, 20, 30, 50, 51, 71, 80, 90, 100, 111, 130, 140 y 150. **Todos los demás son toggle**, por ejemplo 60 y 70. Con un codec toggle, terminá la configuración **con el aire apagado**, para que el kit arranque sabiendo el estado real.
+
+**Con el sensor de vibración (2):** el comando `100` del final **calibra el cero de vibración**. Si lo corrés con la IR suelta o con el aire funcionando, el kit toma un cero incorrecto: Home Assistant muestra el aire **apagado al rato de encenderlo**, y la siguiente orden lo apaga de verdad. Solución: pegá la IR, apagá el aire, esperá a que se detenga del todo y volvé a correr `bgh_sync.py <IP> --codec <n>`.
+
+> **Caso real (codec 70, aire BGH):** con la IR apoyada en un estante junto al aire, el sensor medía la vibración del estante. El aire aparecía apagado al rato y los modos lo apagaban. Con la IR **pegada al gabinete** y recalibrada con el aire detenido, funciona correctamente. "Pegada" significa en contacto firme con el equipo: apoyada al lado no alcanza.
+
+### 4.4 Codecs reportados por la comunidad
+
+| Codec | Trama | Toggle | Aire / control | Notas (según la app) |
+|---|---|---|---|---|
+| 60 | LG | sí | Aire **LG** (agregar modelo de aire y de control) | Mínimo 18 °C (16 °C en calor) |
+| 70 | — | sí | Aire **BGH** (agregar modelo). Con la app oficial **nunca había funcionado**; con `bgh_sync.py` funciona. Aire en otro tomacorriente: **sensor de vibración (2)** con la IR pegada al gabinete y calibrada con el aire detenido. | Mínimo 18 °C; sin velocidad de ventilador en modo seco; swing vertical |
 
 *Si lo configurás, sumá tu modelo de aire, el modelo de control y el codec a esta tabla.*
+
+### 4.5 Todos los codecs que conoce la app
+
+La tabla de protocolos IR vive en el **firmware de la unidad IR**, y la app no trae nombres de marcas ni de modelos, solo números. Estos son los 21 codecs que maneja la app oficial, con lo que la app sabe de cada uno:
+
+| Codec | Toggle | Temp. mín. (°C) | Temp. máx. (°C) | Marca comprobada |
+|---|---|---|---|---|
+| 1 | no | 17 | 30 | |
+| 10 | no | 18 | 30 | |
+| 12 | no | 18 | 30 | |
+| 13 | no | 18 | 30 | |
+| 20 | no | 16 | 30 | |
+| 30 | no | 16 | 30 | |
+| 40 | **sí** | 18 | 32 | |
+| 50 | no | 16 (21 en auto) | 31 (25 en auto) | |
+| 51 | no | 16 | 31 | |
+| 60 | **sí** | 18 (16 en calor) | 30 | LG |
+| 70 | **sí** | 18 | 30 | BGH |
+| 71 | no | 16 | 30 | |
+| 80 | no | 16 | 32 | |
+| 90 | no | 18 | 30 | |
+| 100 | no | 16 | 30 | |
+| 110 | **sí** | 17 | 30 | |
+| 111 | no | 17 | 30 | |
+| 120 | **sí** | 16 | 30 | |
+| 130 | no | 18 | 32 | |
+| 140 | no | 16 | 30 | |
+| 150 | no | 16 | 32 | |
+
+- **No hace falta elegir el codec:** el kit lo detecta solo cuando apretás ENCENDIDO en el control durante el modo aprendizaje. Si tu control no está en la tabla del firmware, el kit no reporta nada.
+- Los números con variantes (10/12/13, 50/51, 70/71, 110/111) parecen familias de un mismo protocolo. Es una inferencia por la numeración, no está confirmado.
+- **Si perdiste el control remoto:** podés forzar un codec sin leer el control y usar la prueba de beeps para encontrar el que tu aire entiende. Este método todavía no está probado:
+  ```bash
+  sudo python3 bgh_sync.py <IP> --codec 10    # ¿beep? si no, probá el siguiente
+  ```
 
 ---
 
@@ -255,6 +314,8 @@ sudo python3 bgh_sync.py <IP_DEL_KIT> --listen
 | En Home Assistant la temperatura salta a 255 °C | Paquetes ACK de 22 bytes parseados como estado | Ver el issue #3 o #5 de firtman/bgh_smart |
 | Home Assistant no recibe estados | Docker sin `network_mode: host`, firewall o aislamiento de clientes Wi-Fi en el router | Revisar la red |
 | `bgh_sync.py`: "No pude abrir el puerto 20911" | Home Assistant tiene tomado el puerto | `docker stop homeassistant` o dejar que el script lo detenga |
+| `bgh_sync.py`: "El kit no respondió" | El kit está ocupado, se cortó el Wi-Fi o la máquina está en otra red | Reintentá; si sigue, revisá que el kit tenga IP y que la máquina esté en la misma red |
+| `bgh_sync.py`: "El kit RECHAZÓ el comando" | El kit recibió el comando pero no lo aceptó (NAK) | Reintentá; si sigue, desenchufá el kit, volvé a enchufarlo y corré el script de nuevo |
 
 ---
 
@@ -269,7 +330,7 @@ Para quien quiera extender la integración. Todo es UDP: los **comandos** van a 
 | 0 | Versión de protocolo (`0x00`) |
 | 1-6 | MAC de origen (`000000000000` desde la app; MAC del kit en sus broadcasts) |
 | 7-12 | MAC de destino (MAC del kit; `ffffffffffff` en broadcasts) |
-| 13 | Número de secuencia |
+| 13 | Número de secuencia. El kit lo **repite en su respuesta**: así se sabe a qué comando corresponde cada ACK/NAK |
 | 14 | Endpoint de origen |
 | 15 | Endpoint de destino (`0` = dispositivo, `1` = termostato/aire) |
 | 16 | Comando |
@@ -295,8 +356,8 @@ Estos son los que usa el asistente de la app:
 | 90 | `[1]` / `[0]` | Activa / desactiva el **modo aprendizaje** |
 | 92 | `[30]` | Pide el estado de la unidad IR. Respuesta: `92, RSSI, batería_lo, batería_hi, …, MAC_IR (últimos 6 bytes)` |
 | 95 | `[codec]` | **(Kit → app, broadcast)** Codec detectado al recibir el control remoto |
-| 88 | `[codec, sensor]` | Fija el codec. Sensor: 0 = ninguno, 1 = aire enchufado en la base, 2 = otro tomacorriente (3 existe en la app, sin uso documentado) |
-| 100 | — | Guarda la configuración |
+| 88 | `[codec, sensor]` | Fija el codec. Sensor: 0 = ninguno, 1 = consumo (aire enchufado en la base), 2 = vibración de la unidad IR (3 existe en la app, sin uso documentado) |
+| 100 | — | **Calibra el cero del sensor de vibración** (`CalibrateZeroVibration` en la app) y cierra la configuración. Requiere la IR pegada y el aire detenido. |
 | 101 | `[offset_lo, offset_hi]` | Ajuste (offset) de la temperatura ambiente (× 100) |
 
 ### Secuencia del asistente de la app
@@ -309,7 +370,7 @@ Estos son los que usa el asistente de la app:
 88 [codec, 0]
 97 (endpoint 1) mode 0, fan 255, flags 255, temp 0x8000   ← cada 3 s, "¿escuchás beeps?"
 88 [codec, sensor]
-100               → guardar
+100               → calibrar cero de vibración (IR pegada, aire detenido)
 101 [offset]      → opcional
 90 [0]            → salir del modo aprendizaje
 ```
