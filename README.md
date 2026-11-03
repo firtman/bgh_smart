@@ -233,6 +233,11 @@ Enciende o apaga el equipo.
 1. El aire envía broadcasts automáticamente cuando cambia su estado
 2. También hay polling de respaldo cada 5 segundos
 3. Si usas el control remoto físico, el cambio debería reflejarse casi inmediatamente
+4. Si los **comandos funcionan pero el estado nunca cambia**, los broadcasts UDP del puerto `20911` no están llegando a Home Assistant (los comandos van por unicast al `20910`, el estado llega por broadcast). Causas frecuentes:
+   - Un firewall en el host descarta los broadcasts. Con `ufw`: `sudo ufw allow from <IP_DEL_AIRE> to any port 20911 proto udp`
+   - Home Assistant en Docker sin `network_mode: host`: en una red bridge los broadcasts de la LAN no llegan al contenedor
+   - Repetidores o APs con aislamiento de clientes o filtro de broadcast
+5. Para verificar que llegan: `sudo tcpdump -ni <interfaz> -A udp port 20911 and host <IP_DEL_AIRE>`. Con el aire encendido tienen que verse paquetes de 29 bytes cada pocos segundos
 
 ## Limitaciones Conocidas
 
