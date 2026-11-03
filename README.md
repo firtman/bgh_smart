@@ -241,6 +241,20 @@ Enciende o apaga el equipo.
 
 ---
 
+## Probar sin Home Assistant
+
+`tools/bgh_cli.py` controla el aire desde la línea de comandos (solo librería estándar), útil para probar un equipo o automatizarlo:
+
+```bash
+python3 tools/bgh_cli.py --ip <IP_DEL_AIRE> status
+python3 tools/bgh_cli.py --ip <IP_DEL_AIRE> set cool 24 low
+python3 tools/bgh_cli.py --ip <IP_DEL_AIRE> off
+```
+
+También acepta las variables `BGH_IP` y `BGH_MAC`. `status` necesita recibir los broadcasts del puerto `20911`.
+
+---
+
 ## Protocolo UDP BGH Smart
 
 ### Arquitectura de Comunicación
